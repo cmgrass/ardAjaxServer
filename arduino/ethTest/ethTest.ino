@@ -7,7 +7,7 @@ typedef struct eth_shield_t {
   int spi_mosi;
   int spi_et_sel;
   int spi_sd_sel;
-} ETH_SHIELD_T;
+} eth_shield_t;
 
 int init_spi(eth_shield_t *eth_shield_p) {
   /* Assignments */
@@ -46,13 +46,53 @@ void setup() {
 }
 
 void loop() {
+  boolean currentLineBlank = true;
+  char chr = '\0';
+
   EthernetClient client = server.available();
+
   if (client) {
-    Serial.println("Bacon11");
+    Serial.println("Client available");
+    currentLineBlank = true;
+    while (client.connected()) {
+      if (client.available()) {
+        /* Process client request */
+        chr = client.read();
+        Serial.write(chr);
+        
+        /* http request ends with '\n', then we can reply */
+        if (chr == '\n' && currentLineBlank) {
+          Serial.println("We can reply");
+          /* Send standard http resopnse header */
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-Type: text/html");
+          client.println("Connection: close");
+          client.println();
+
+          /* Send webpage */
+          client.println("<!DOCTYPE html>");
+          client.println("<html>");
+          client.println("<head>");
+          client.println("<title>Chris Arduino Webpage</title>");
+          client.println("</head>");
+          client.println("<body>");
+          client.println("<h1>My Arduino sent this!! cool!!!</h1>");
+          client.println("<p>My paragraph is even cooler</p>");
+          client.println("</body>");
+          client.println("</html>");
+          break;
+        }
+        if (chr == '\n') {
+          // Newline
+          currentLineBlank = true;
+        } else if (chr != '\r') {
+          // Character on current line
+          currentLineBlank = false;
+        }
+      }
+    }
+    delay(1);
+    client.stop();
+    Serial.println("Disconnected from client");
   }
-  /*
-  Serial.println("Corndog");
-  Serial.println(eth_shield_p->spi_sd_sel, HEX);
-  delay(1000);
-  */
 }
