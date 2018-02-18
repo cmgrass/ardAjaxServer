@@ -1,5 +1,6 @@
 #include <SPI.h>
 #include <Ethernet.h>
+#include <SD.h>
 
 typedef struct eth_shield_t {
   int spi_sck;
@@ -24,7 +25,7 @@ int init_spi(eth_shield_t *eth_shield_p) {
   return 0;
 } 
 
-int send_http(EthernetClient *client_p) {
+int send_http(EthernetClient *client_p, File *file_p) {
   /* Send standard http resopnse header */
   client_p->println("HTTP/1.1 200 OK");
   client_p->println("Content-Type: text/html");
@@ -32,16 +33,13 @@ int send_http(EthernetClient *client_p) {
   client_p->println();
 
   /* Send webpage */
-  client_p->println("<!DOCTYPE html>");
-  client_p->println("<html>");
-  client_p->println("<head>");
-  client_p->println("<title>Chris Arduino Webpage</title>");
-  client_p->println("</head>");
-  client_p->println("<body>");
-  client_p->println("<h1>My Arduino sent this!! cool!!!</h1>");
-  client_p->println("<p>My paragraph is even cooler</p>");
-  client_p->println("</body>");
-  client_p->println("</html>");
+  *file_p = SD.open("main.htm");
+  if (file_p) {
+    while (file_p->available()) {
+      client_p->write(file_p->read());
+    }
+    file_p->close();
+  }
   return 0; 
 }
 
@@ -56,8 +54,7 @@ IPAddress ip(192, 168, 2, 125);
 IPAddress subnet(255, 255, 255, 0);
 /*IPAddress gateway(192, 168, 0, 1);*/
 EthernetServer server(80);
-
-
+File webFile;
 
 void setup() {
   status = init_spi(eth_shield_p);
@@ -66,6 +63,17 @@ void setup() {
   server.begin();
   Serial.print("server is at: ");
   Serial.println(Ethernet.localIP());
+  Serial.println("Initializing sd card...");
+  if (!SD.begin(eth_shield_p->spi_sd_sel)) {
+    Serial.println("SD Initialization FAILED");
+    return;
+  }
+  Serial.println("SD Initialization SUCCESS");
+  if (!SD.exists("main.htm")) {
+    Serial.println("ERROR: Can't find main.htm on SD");
+    return;
+  }
+  Serial.println("Success, found SD card");
 }
 
 void loop() {
@@ -86,7 +94,7 @@ void loop() {
         /* http request ends with '\n', then we can reply */
         if (chr == '\n' && currentLineBlank) {
           Serial.println("We can reply");
-          status = send_http(&client);
+          status = send_http(&client, &webFile);
           break;
         }
         if (chr == '\n') {
