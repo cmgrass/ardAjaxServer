@@ -24,6 +24,27 @@ int init_spi(eth_shield_t *eth_shield_p) {
   return 0;
 } 
 
+int send_http(EthernetClient *client_p) {
+  /* Send standard http resopnse header */
+  client_p->println("HTTP/1.1 200 OK");
+  client_p->println("Content-Type: text/html");
+  client_p->println("Connection: close");
+  client_p->println();
+
+  /* Send webpage */
+  client_p->println("<!DOCTYPE html>");
+  client_p->println("<html>");
+  client_p->println("<head>");
+  client_p->println("<title>Chris Arduino Webpage</title>");
+  client_p->println("</head>");
+  client_p->println("<body>");
+  client_p->println("<h1>My Arduino sent this!! cool!!!</h1>");
+  client_p->println("<p>My paragraph is even cooler</p>");
+  client_p->println("</body>");
+  client_p->println("</html>");
+  return 0; 
+}
+
 /* Declare Globals */
 int status = 0;
 eth_shield_t eth_shield_d;
@@ -35,6 +56,8 @@ IPAddress ip(192, 168, 2, 125);
 IPAddress subnet(255, 255, 255, 0);
 /*IPAddress gateway(192, 168, 0, 1);*/
 EthernetServer server(80);
+
+
 
 void setup() {
   status = init_spi(eth_shield_p);
@@ -63,23 +86,7 @@ void loop() {
         /* http request ends with '\n', then we can reply */
         if (chr == '\n' && currentLineBlank) {
           Serial.println("We can reply");
-          /* Send standard http resopnse header */
-          client.println("HTTP/1.1 200 OK");
-          client.println("Content-Type: text/html");
-          client.println("Connection: close");
-          client.println();
-
-          /* Send webpage */
-          client.println("<!DOCTYPE html>");
-          client.println("<html>");
-          client.println("<head>");
-          client.println("<title>Chris Arduino Webpage</title>");
-          client.println("</head>");
-          client.println("<body>");
-          client.println("<h1>My Arduino sent this!! cool!!!</h1>");
-          client.println("<p>My paragraph is even cooler</p>");
-          client.println("</body>");
-          client.println("</html>");
+          status = send_http(&client);
           break;
         }
         if (chr == '\n') {
