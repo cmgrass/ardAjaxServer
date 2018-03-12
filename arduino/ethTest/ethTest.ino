@@ -2,6 +2,14 @@
 #include <Ethernet.h>
 #include <SD.h>
 
+#define CMG_DBG
+
+#ifdef CMG_DBG
+#define CMG_PRINT(x) Serial.println x
+#else
+#define CMG_PRINT(x) do {} while (0)
+#endif
+
 typedef struct eth_shield_t {
   int spi_sck;
   int spi_miso;
@@ -58,22 +66,24 @@ File webFile;
 
 void setup() {
   status = init_spi(eth_shield_p);
+#ifdef CMG_DBG
   Serial.begin(9600);
+#endif
   Ethernet.begin(mac, ip);
   server.begin();
-  Serial.print("server is at: ");
-  Serial.println(Ethernet.localIP());
-  Serial.println("Initializing sd card...");
+  CMG_PRINT(("sever is at: "));
+  CMG_PRINT((Ethernet.localIP()));
+  CMG_PRINT(("Initializing sd card..."));
   if (!SD.begin(eth_shield_p->spi_sd_sel)) {
-    Serial.println("SD Initialization FAILED");
+    CMG_PRINT(("SD Initialization FAILED"));
     return;
   }
-  Serial.println("SD Initialization SUCCESS");
+  CMG_PRINT(("SD Initialization SUCCESS"));
   if (!SD.exists("main.htm")) {
-    Serial.println("ERROR: Can't find main.htm on SD");
+    CMG_PRINT(("ERROR: Can't find main.htm on SD"));
     return;
   }
-  Serial.println("Success, found SD card");
+  CMG_PRINT(("Success, found SD card"));
 }
 
 void loop() {
@@ -83,17 +93,19 @@ void loop() {
   EthernetClient client = server.available();
 
   if (client) {
-    Serial.println("Client available");
+    CMG_PRINT(("Client available"));
     currentLineBlank = true;
     while (client.connected()) {
       if (client.available()) {
         /* Process client request */
         chr = client.read();
+        #ifdef CMG_DBG
         Serial.write(chr);
-        
+        #endif
+
         /* http request ends with '\n', then we can reply */
         if (chr == '\n' && currentLineBlank) {
-          Serial.println("We can reply");
+          CMG_PRINT(("We can reply"));
           status = send_http(&client, &webFile);
           break;
         }
@@ -108,6 +120,6 @@ void loop() {
     }
     delay(1);
     client.stop();
-    Serial.println("Disconnected from client");
+    CMG_PRINT(("Disconnected from client"));
   }
 }
