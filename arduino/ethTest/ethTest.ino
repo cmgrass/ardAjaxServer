@@ -1,6 +1,7 @@
 #include <SPI.h>
 #include <Ethernet.h>
 #include <SD.h>
+#include <string.h>
 
 #define CMG_DBG
 
@@ -10,6 +11,12 @@
 #define CMG_PRINT(x) do {} while (0)
 #endif
 
+#define MAX_STR_C 512
+#define HTML_STDREQ_C 111
+#define HTML_GETTEST_C 115
+#define SUCCESS 0
+#define ERROR -1
+
 typedef struct eth_shield_t {
   int spi_sck;
   int spi_miso;
@@ -18,6 +25,9 @@ typedef struct eth_shield_t {
   int spi_sd_sel;
 } eth_shield_t;
 
+/*-------------------------------------------------
+           L O C A L   F U N C T I O N S
+-------------------------------------------------*/
 int init_spi(eth_shield_t *eth_shield_p) {
   /* Assignments */
   eth_shield_p->spi_sck = 13;
@@ -31,9 +41,45 @@ int init_spi(eth_shield_t *eth_shield_p) {
   digitalWrite(eth_shield_p->spi_sd_sel, HIGH);
 
   return 0;
-} 
+} /* init_spi */
 
-int send_http(EthernetClient *client_p, File *file_p) {
+int proc_req(char *req_p, int *requestType_p)
+{
+  const char *getStr_p = "GET /test.txt";
+  char *retPtr_p = NULL;
+
+  retPtr_p = strstr(req_p, getStr_p);
+  if (retPtr_p == NULL) {
+    *requestType_p = HTML_STDREQ_C;
+  } else {
+    *requestType_p = HTML_GETTEST_C;
+  }
+  return SUCCESS;
+} /* proc_req */
+
+int write_http_data(EthernetClient *client_p, File *file_p)
+{
+  int status = SUCCESS;
+
+  if (file_p) {
+    while (file_p->available()) {
+      client_p->write(file_p->read());
+    }
+    file_p->close();
+  } else {
+    status = ERROR;
+  }
+  return status; 
+} /* write_http_data */
+
+int send_http(EthernetClient *client_p, char *req_p, File *file_p)
+{
+  int status = SUCCESS;
+  int requestType = 0;
+
+  /* Process Request */
+  status = proc_req(req_p, &requestType);
+
   /* Send standard http resopnse header */
   client_p->println("HTTP/1.1 200 OK");
   client_p->println("Content-Type: text/html");
@@ -41,17 +87,29 @@ int send_http(EthernetClient *client_p, File *file_p) {
   client_p->println();
 
   /* Send webpage */
-  *file_p = SD.open("main.htm");
-  if (file_p) {
-    while (file_p->available()) {
-      client_p->write(file_p->read());
-    }
-    file_p->close();
-  }
-  return 0; 
-}
+  switch (requestType) {
+    case HTML_STDREQ_C:
+      CMG_PRINT(("DBG: HTML_STDREQ_C"));
+      *file_p = SD.open("main.htm");
+      status = write_http_data(client_p, file_p);
+      break;
 
-/* Declare Globals */
+    case HTML_GETTEST_C:
+      CMG_PRINT(("DBG: HTML_GETREQ_C"));
+      *file_p = SD.open("test.txt");
+      status = write_http_data(client_p, file_p);
+      break;
+
+    default:
+      break;
+  }
+
+  return status; 
+} /* send_http */
+
+/*-------------------------------------------------
+          D E C L A R E   G L O B A L S
+-------------------------------------------------*/
 int status = 0;
 eth_shield_t eth_shield_d;
 eth_shield_t *eth_shield_p = &eth_shield_d;
@@ -64,6 +122,9 @@ IPAddress subnet(255, 255, 255, 0);
 EthernetServer server(80);
 File webFile;
 
+/*-------------------------------------------------
+                    S E T U P
+-------------------------------------------------*/
 void setup() {
   status = init_spi(eth_shield_p);
 #ifdef CMG_DBG
@@ -73,40 +134,47 @@ void setup() {
   server.begin();
   CMG_PRINT(("sever is at: "));
   CMG_PRINT((Ethernet.localIP()));
-  CMG_PRINT(("Initializing sd card..."));
   if (!SD.begin(eth_shield_p->spi_sd_sel)) {
-    CMG_PRINT(("SD Initialization FAILED"));
     return;
   }
   CMG_PRINT(("SD Initialization SUCCESS"));
   if (!SD.exists("main.htm")) {
-    CMG_PRINT(("ERROR: Can't find main.htm on SD"));
     return;
   }
-  CMG_PRINT(("Success, found SD card"));
 }
 
+/*-------------------------------------------------
+                     L O O P
+-------------------------------------------------*/
 void loop() {
   boolean currentLineBlank = true;
+  int idx = 0;
   char chr = '\0';
+  char httpReq_p[MAX_STR_C]; 
 
+  httpReq_p[MAX_STR_C - 1] = '\0';
   EthernetClient client = server.available();
 
   if (client) {
     CMG_PRINT(("Client available"));
     currentLineBlank = true;
+    chr = '\0';
+    idx = 0;
     while (client.connected()) {
       if (client.available()) {
         /* Process client request */
         chr = client.read();
+        if (idx >= MAX_STR_C) {
+          break;
+        }
+        httpReq_p[idx++] = chr;
         #ifdef CMG_DBG
         Serial.write(chr);
         #endif
-
         /* http request ends with '\n', then we can reply */
         if (chr == '\n' && currentLineBlank) {
           CMG_PRINT(("We can reply"));
-          status = send_http(&client, &webFile);
+          status = send_http(&client, httpReq_p, &webFile);
           break;
         }
         if (chr == '\n') {
@@ -120,6 +188,6 @@ void loop() {
     }
     delay(1);
     client.stop();
-    CMG_PRINT(("Disconnected from client"));
+    CMG_PRINT(("Disconnected from client\n\n"));
   }
 }

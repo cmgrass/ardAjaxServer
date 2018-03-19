@@ -2,16 +2,55 @@
 <html>
   <head>
     <title>Chris Arduino Webpage</title>
+    <script>
+      function ToggleLed()
+      {
+        nocache = "&nocache=" + Math.random() * 1000000;
+        var myXhttp= new XMLHttpRequest();
+
+        // Assign a success handler function
+        myXhttp.onreadystatechange = function() {
+          if ((this.readyState = 4) && (this.status  == 200)) {
+            // readyState == 4: request finished and response ready
+            // status == 200:   OK
+            document.getElementById("test").innerHTML = "Working!";
+            console.log("DBG: success");
+          } 
+        };
+
+        // Parameterize the Ajax Request
+        myXhttp.open("GET", "test.txt", true);
+
+        // Send the Ajax Request
+        myXhttp.send();
+      }
+
+      function resetDoc()
+      {
+        document.getElementById("test").innerHTML = ""
+        console.log("DBG: reset attempt made")
+      }
+    </script>
   </head>
   <body>
     <div>
       <span>My Arduino sent this!! cool!!!!</span>
       <p>My paragraph element is even cooler than the heading.</p>
-    <div>
     </div>
+    <div>
       <span>Do Stuff Button</span>
       <p>Click this button to do cool things!</p>
-      <input type="checkbox" name="redLED" value="2" onclick="submit();">RED LED
+      <input type="checkbox" name="redLED" value="2" onclick="ToggleLed();">RED LED
+    </div>
+    <div>
+      <span>Reset Button</span>
+      <p>Click this button to reset the change</p>
+      <input type="button" name="resetButton" value="RESET" onclick="resetDoc()">
+    </div>
+    <div>
+      <span>Status of Ajax:</span>
+      <div id="test">
+      </div>
     </div>
   </body>
 </html>
