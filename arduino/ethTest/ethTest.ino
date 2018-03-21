@@ -2,6 +2,7 @@
 #include <Ethernet.h>
 #include <SD.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define CMG_DBG
 
@@ -28,6 +29,22 @@ typedef struct eth_shield_t {
 /*-------------------------------------------------
            L O C A L   F U N C T I O N S
 -------------------------------------------------*/
+int alloc_req(char *req_p)
+{
+  int idx = 0;
+
+  if (req_p != NULL) {
+    /* Destroy first */
+    free(req_p);
+  } else {
+    req_p = malloc(MAX_STR_C + 1);
+    for (idx = 0; idx >= MAX_STR_C; idx++) {
+      req_p[idx] = '\0';
+    }
+  }
+  return SUCCESS;
+} /* alloc_req */
+
 int init_spi(eth_shield_t *eth_shield_p) {
   /* Assignments */
   eth_shield_p->spi_sck = 13;
@@ -51,8 +68,10 @@ int proc_req(char *req_p, int *requestType_p)
   retPtr_p = strstr(req_p, getStr_p);
   if (retPtr_p == NULL) {
     *requestType_p = HTML_STDREQ_C;
+    CMG_PRINT(("GET TEST NOT FOUND"));
   } else {
     *requestType_p = HTML_GETTEST_C;
+    CMG_PRINT(("GET TEST FOUND"));
   }
   return SUCCESS;
 } /* proc_req */
@@ -104,6 +123,8 @@ int send_http(EthernetClient *client_p, char *req_p, File *file_p)
       break;
   }
 
+  CMG_PRINT((status));
+
   return status; 
 } /* send_http */
 
@@ -149,45 +170,53 @@ void setup() {
 void loop() {
   boolean currentLineBlank = true;
   int idx = 0;
+  int status = 0;
   char chr = '\0';
-  char httpReq_p[MAX_STR_C]; 
+  char *httpReq_p = NULL; 
+  EthernetClient client;
 
-  httpReq_p[MAX_STR_C - 1] = '\0';
-  EthernetClient client = server.available();
+  while (1) {
+    /* check if client available */
+    client = server.available();
 
-  if (client) {
-    CMG_PRINT(("Client available"));
-    currentLineBlank = true;
-    chr = '\0';
-    idx = 0;
-    while (client.connected()) {
-      if (client.available()) {
-        /* Process client request */
-        chr = client.read();
-        if (idx >= MAX_STR_C) {
-          break;
-        }
-        httpReq_p[idx++] = chr;
-        #ifdef CMG_DBG
-        Serial.write(chr);
-        #endif
-        /* http request ends with '\n', then we can reply */
-        if (chr == '\n' && currentLineBlank) {
-          CMG_PRINT(("We can reply"));
-          status = send_http(&client, httpReq_p, &webFile);
-          break;
-        }
-        if (chr == '\n') {
-          // Newline
-          currentLineBlank = true;
-        } else if (chr != '\r') {
-          // Character on current line
-          currentLineBlank = false;
+    if (client) {
+      CMG_PRINT(("Client available"));
+      currentLineBlank = true;
+      chr = '\0';
+      idx = 0;
+
+      /* Allocate string */
+      status = alloc_req(httpReq_p);
+
+      while (client.connected()) {
+        if (client.available()) {
+          /* Process client request */
+          chr = client.read();
+          if (idx >= MAX_STR_C) {
+            break;
+          }
+          #ifdef CMG_DBG
+          Serial.write(chr);
+          #endif
+          /* http request ends with '\n', then we can reply */
+          if (chr == '\n' && currentLineBlank) {
+            CMG_PRINT(("We can reply"));
+            status = send_http(&client, httpReq_p, &webFile);
+            break;
+          }
+          if (chr == '\n') {
+            // Newline
+            currentLineBlank = true;
+          } else if (chr != '\r') {
+            // Character on current line
+            currentLineBlank = false;
+          }
         }
       }
+      delay(1);
+      client.stop();
+      free(httpReq_p);
+      CMG_PRINT(("Disconnected from client\n\n"));
     }
-    delay(1);
-    client.stop();
-    CMG_PRINT(("Disconnected from client\n\n"));
   }
 }
