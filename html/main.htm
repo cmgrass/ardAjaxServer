@@ -13,7 +13,9 @@
           if ((this.readyState = 4) && (this.status  == 200)) {
             // readyState == 4: request finished and response ready
             // status == 200:   OK
-            document.getElementById("test").innerHTML = "Working!";
+            document.getElementById("test").innerHTML = myXhttp.responseText;
+            console.log(myXhttp.response);
+            console.log(myXhttp.responseText);
             console.log("DBG: success");
           } 
         };
