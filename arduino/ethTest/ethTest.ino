@@ -14,7 +14,7 @@
 #define CMG_PRINT(x) do {} while (0)
 #endif
 
-#define MAX_STR_C 430
+#define MAX_STR_C 32
 #define HTML_STDREQ_C 111
 #define HTML_GETTEST_C 115
 #define SUCCESS 0
@@ -31,19 +31,19 @@ typedef struct eth_shield_t {
 /*-------------------------------------------------
            L O C A L   F U N C T I O N S
 -------------------------------------------------*/
-int alloc_req(char **req_p)
+int alloc_req(char **req_pp)
 {
   int idx = 0;
   int status = SUCCESS;
 
-  if ((*req_p) == NULL) {
-    *req_p = malloc(MAX_STR_C + 1);
+  if ((*req_pp) == NULL) {
+    *req_pp = malloc(MAX_STR_C + 1);
   }
 
-  if ((*req_p) != NULL) {
+  if ((*req_pp) != NULL) {
     /* Initialize */
     for (idx = 0; idx >= MAX_STR_C; idx++) {
-      *(req_p[idx]) = '\0';
+      *(req_pp[idx]) = '\0';
     }
   } else {
     CMG_PRINT(("DBG: Mem err"));
@@ -68,17 +68,17 @@ int init_spi(eth_shield_t *eth_shield_p) {
   return 0;
 } /* init_spi */
 
-int proc_req(char **req_p, int *requestType_p)
+int proc_req(char **req_pp, int *requestType_p)
 {
   const char *getStr_p = "GET /test.txt";
   char *retPtr_p = NULL;
-
 /*
-  retPtr_p = strstr(*req_p, getStr_p);
+  testChar = (char)*((*req_pp) + 0);
+  CMG_PRINT((testChar, HEX));
 */
+  retPtr_p = strstr(*req_pp, getStr_p);
   if (retPtr_p == NULL) {
     *requestType_p = HTML_STDREQ_C;
-    CMG_PRINT(("DBG: fileErr"));
   } else {
     *requestType_p = HTML_GETTEST_C;
   }
@@ -101,13 +101,13 @@ int write_http_data(EthernetClient *client_p, File *file_p)
   return status; 
 } /* write_http_data */
 
-int send_http(EthernetClient *client_p, char **req_p, File *file_p)
+int send_http(EthernetClient *client_p, char **req_pp, File *file_p)
 {
   int status = SUCCESS;
   int requestType = 0;
 
   /* Process Request */
-  status = proc_req(req_p, &requestType);
+  status = proc_req(req_pp, &requestType);
 
   /* Send standard http resopnse header */
   client_p->println("HTTP/1.1 200 OK");
@@ -200,14 +200,15 @@ void loop() {
           if (client.available()) {
             /* Process client request */
             chr = client.read();
-            if (idx >= MAX_STR_C) {
-              CMG_PRINT(("DBG: Req Excess"));
-              break;
-            }
+
             #ifdef CMG_DBG
             Serial.write(chr);
             #endif
-            *(httpReq_p + (idx++)) = chr;
+
+            if (idx < MAX_STR_C) {
+              *(httpReq_p + (idx++)) = chr;
+            }
+
             /* http request ends with '\n', then we can reply */
             if (chr == '\n' && currentLineBlank) {
               CMG_PRINT(("Req Rcvd"));
