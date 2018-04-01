@@ -101,7 +101,16 @@ int write_http_data(EthernetClient *client_p, File *file_p)
   return status; 
 } /* write_http_data */
 
-int send_http(EthernetClient *client_p, char **req_pp, File *file_p)
+void relay_toggle(int *pin_p)
+{
+  if (!digitalRead(*pin_p)) {
+    digitalWrite(*pin_p, HIGH);
+  } else {
+    digitalWrite(*pin_p, LOW);
+  }
+} /* relay_toggle */
+
+int send_http(EthernetClient *client_p, char **req_pp, File *file_p, int *pin_p)
 {
   int status = SUCCESS;
   int requestType = 0;
@@ -127,6 +136,7 @@ int send_http(EthernetClient *client_p, char **req_pp, File *file_p)
       CMG_PRINT(("GETREQ"));
       *file_p = SD.open("test.txt");
       status = write_http_data(client_p, file_p);
+      relay_toggle(pin_p);
       break;
 
     default:
@@ -140,6 +150,7 @@ int send_http(EthernetClient *client_p, char **req_pp, File *file_p)
           D E C L A R E   G L O B A L S
 -------------------------------------------------*/
 int status = 0;
+int q2_relay = 2; /* Output 2, for relay */
 eth_shield_t eth_shield_d;
 eth_shield_t *eth_shield_p = &eth_shield_d;
 byte mac[] = {
@@ -156,6 +167,7 @@ File webFile;
 -------------------------------------------------*/
 void setup() {
   status = init_spi(eth_shield_p);
+  pinMode(q2_relay, OUTPUT);
 #ifdef CMG_DBG
   Serial.begin(9600);
 #endif
@@ -212,7 +224,7 @@ void loop() {
             /* http request ends with '\n', then we can reply */
             if (chr == '\n' && currentLineBlank) {
               CMG_PRINT(("Req Rcvd"));
-              status = send_http(&client, &httpReq_p, &webFile);
+              status = send_http(&client, &httpReq_p, &webFile, &q2_relay);
               break;
             }
             if (chr == '\n') {
