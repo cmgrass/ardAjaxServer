@@ -5,4 +5,4 @@ Milestones:
 2) Serve basic html (DONE)
 3) Serve html from sd card (DONE)
 4) Buttons make ajax get request (DONE)
-5) Control servo, or toggle 120VAC light!
+5) Control servo, or toggle 120VAC light! (DONE)
